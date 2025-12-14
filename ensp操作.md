@@ -314,14 +314,62 @@ STP/RSTP需要通过BPDU报文交互来完成生成树计算。因此，需先�
 ```
 
 ## 3. OSPF
+### 创建/关闭OSPF进程
+process-id 为进程号，缺省值为1。路由器支持OSPF多进程，可以根据业务类型划分不同的进程。进程号是本地概念，不影响与其它路由器之间的报文交换。因此，不同的路由器之间，即使进程号不同也可以进行报文交换。 
+```
+[RT]ospf process-id
+[RT]undo ospf process-id
+```
+### 配置路由器id
+（1）**<font color="red">不论IPv4还是IPv6</font>**，路由器的ID号都是一个32比特的无符号整数，为点分十进制格式，它是路由器所在自治系统中的唯一标识。  
+（2）如果路由器所有的接口都没有配置IP地址，那么用户必须配置路由器ID号，否则OSPF无法运行。
+```
+[RT]router-id X     //X为路由器的ID号。
+```
+缺省情况下，路由器系统会从当前接口的IP地址中自动选取一个最大值作为Router ID。手动配置Router ID时，必须保证自治系统中任意两台Router ID都不相同。通常的做法是将Router ID配置为与该设备某个接口的IP地址一致，这样便可以保证它的唯一性。
+### 删除/创建区域
+```
+[sw-ospf-1]area 0
+[sw-ospf-1]undo area 0          //区域默认是32位表示
+```
+### 在区域中指定网段
+```
+[sw-ospf-1-area-0.0.0.0]net x.x.x.x y.y.y.y(前者是网段地址/接口地址、后者是子网掩码反码/子网掩码)
+[sw-ospf-1]undo area 0
+```
+### 在接口上使能OSPF<font color="red">（但是必须先创建OSPF进程和区域）</font>
+```
+[RT-g0/0/0]ospf enable process-id area area-id
+    eg.[RT-g0/0/0]ospf enable 1 area 0
+```
 ### IPv4环境（OSPF）
 ```
+<RT>sys
+[RT]ospf 1
+[RT]route-if 1.1.1.1
+[RT]area 0
+[sw-ospf-1-area-0.0.0.0]quit
+[RT]int g 0/0/0
+[RT-GigabitEthernet0/0/0]ospf enable 1 area 0
 ```
-### IPv6环境（OSPFv）
+### IPv6环境（OSPFv3）
 ```
+<RT>sys
+[RT]ospfb3 1
+[RT]route-if 1.1.1.1
+[RT]area 0
+[sw-ospf-1-area-0.0.0.0]quit
+[RT]int g 0/0/0
+[RT-GigabitEthernet0/0/0]ospf enable 1 area 0
 ```
- ## 4. 路由引入
+## 4. 路由引入
 在缺省情况下，各路由协议不引入其它协议的路由。可以引入其他进程或其他协议学到的路由信息，从而丰富路由表项。
+```
+[RT]ripng 1
+[RT-ripng-1]import-route {direct | ospfv3 | static}
+[RT]ospfv3 1
+[RT-ospfv3-1]import-route {direct | ripng | static}
+```
 
 
 # 第七章：IPv6基础
@@ -337,18 +385,18 @@ STP/RSTP需要通过BPDU报文交互来完成生成树计算。因此，需先�
 ## 2. 有状态自动配置（DHCP）
 ```
 <RT>sys
-[R2]ipv6 
-[R2]dhcp enable	            //全局使能DHCP
-[R2]dhcpv6 pool pool1       //建立地址池
-[R2-dhcpv6-pool-pool1]address prefix FC00:2::/64        //配置地址池网段
-[R2-dhcpv6-pool-pool1]excluded-address FC00:2::1        //从地址池中将固定分配给路由器接口IP地址去除
-[R2-dhcpv6-pool-pool1]quit
-[R2]int GigabitEthernet 0/0/9
-[R2-GigabitEthernet0/0/9]ipv6 enable 
-[R2-GigabitEthernet0/0/9]ipv6 address FC00:2::1 64
-[R2-GigabitEthernet0/0/9]dhcpv6 server pool1            //将接口与地址池绑定
-[R2-GigabitEthernet0/0/9]undo ipv6 nd ra halt
-[R2-GigabitEthernet0/0/9]ipv6 nd autoconfig managed-address-flag  #此命令用来设置RA报文中的有状态自动配置地址的标志位, 如果设置了该标志位，则PC可以通过DHCPv6有状态自动分配方式获得IPv6地址。
+[RT]ipv6 
+[RT]dhcp enable	            //全局使能DHCP
+[RT]dhcpv6 pool pool1       //建立地址池
+[RT-dhcpv6-pool-pool1]address prefix FC00:2::/64        //配置地址池网段
+[RT-dhcpv6-pool-pool1]excluded-address FC00:2::1        //从地址池中将固定分配给路由器接口IP地址去除
+[RT-dhcpv6-pool-pool1]quit
+[RT]int GigabitEthernet 0/0/9
+[RT-GigabitEthernet0/0/9]ipv6 enable 
+[RT-GigabitEthernet0/0/9]ipv6 address FC00:2::1 64
+[RT-GigabitEthernet0/0/9]dhcpv6 server pool1            //将接口与地址池绑定
+[RT-GigabitEthernet0/0/9]undo ipv6 nd ra halt
+[RT-GigabitEthernet0/0/9]ipv6 nd autoconfig managed-address-flag  #此命令用来设置RA报文中的有状态自动配置地址的标志位, 如果设置了该标志位，则PC可以通过DHCPv6有状态自动分配方式获得IPv6地址。
 ```
 
 ## 3. 无状态自动配置（SLAAC）
