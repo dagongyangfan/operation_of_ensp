@@ -1,22 +1,23 @@
 # 常用视图
-用户视图<Huawei>
-系统视图[Huawei]
-接口视图
+    用户视图<Huawei>  
+    系统视图[Huawei]  
+    接口视图  
 
 
 # 常用指令
-<Huawei> undo terminal monitor    //关闭日志，以获取更好的显示
-<Huawei> sys                      //进入系统视图
-[Huawei] sysname xxx              //更改设备名
+    <Huawei> undo terminal monitor    //关闭日志，以获取更好的显示
+    <Huawei> sys                      //进入系统视图
+    [Huawei] sysname xxx              //更改设备名
 
 
 # 使用telnet方式登录交换机
-## IPv4
-1. 配置交换机IP地址和子网掩码
-    <sw> sys
-    [sw] int vlanif 1
-    [sw-vlanif1] ip add x.x.x.x xx
-2. 配置用户远程登录（模式）口令和权限
+## 1. IPv4环境
+### 配置交换机IP地址和子网掩码
+    <sw> sys  
+    [sw] int vlanif 1  
+    [sw-vlanif1] ip add x.x.x.x xx  
+
+### 配置用户远程登录（模式）口令和权限**
     //使能服务器功能
     <sw> sys
     [sw] telnet server enable
@@ -29,8 +30,8 @@
     [sw-ui-vty0-4] set authentication password simple xxx      
     [sw-ui-vty0-4] user privilege level 15
 
-// ensp中PC机不支持Telnet功能，因此使用交换机代替PC机进行实验
-3. 配置“PC机”IP地址
+### 配置“PC机”IP地址
+    // ensp中PC机不支持Telnet功能，因此使用交换机代替PC机进行实验
     <pc> sys
     [pc] int vlanif 1
     [pc-vlanif1] ip add x.x.x.x xx  //与交换机配置在同一网段
@@ -38,7 +39,7 @@
     <pc> telnet x.x.x.x
     // 按照提示输入密码
 
-## IPv6
+## 2. IPv6
     <sw>sys
     [sw]ipv6                        //全局使能ipv6
     [sw]int Vlanif 1
