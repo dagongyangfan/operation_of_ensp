@@ -508,7 +508,3 @@ NAT有两种实现方式：
 ```
 [RT]nat alg ftp enable
 ```  
-      
-
-
-
