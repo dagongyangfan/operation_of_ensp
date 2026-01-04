@@ -306,11 +306,11 @@ STP/RSTP需要通过BPDU报文交互来完成生成树计算。因此，需先�
 ```
 <RT>sys
 [RT]ipv6           //全局使能ipv6
-[RT]ripng 1        //全局使能RIPng
+[RT]ripng 1        //启动RIPng进程
 [RT]int g 0/0/0
 [RT-g0/0/0]ipv6 enable      //接口使能ipv6
 [RT-g0/0/0]ipv6 add ...
-[RT-g0/0/0]ripng 1 enable   //接口使能RIPng
+[RT-g0/0/0]ripng 1 enable   //接口与RIPng 1 进程关联
 ```
 
 ## 3. OSPF
@@ -334,7 +334,7 @@ process-id 为进程号，缺省值为1。路由器支持OSPF多进程，可以�
 ```
 ### 在区域中指定网段
 ```
-[sw-ospf-1-area-0.0.0.0]net x.x.x.x y.y.y.y(前者是网段地址/接口地址、后者是子网掩码反码/子网掩码)
+[sw-ospf-1-area-0.0.0.0]net x.x.x.x y.y.y.y(前者是网段地址/接口地址、后者是子网掩码反码)
 [sw-ospf-1]undo area 0
 ```
 ### 在接口上使能OSPF<font color="red">（但是必须先创建OSPF进程和区域）</font>
@@ -344,23 +344,29 @@ process-id 为进程号，缺省值为1。路由器支持OSPF多进程，可以�
 ```
 ### IPv4环境（OSPF）
 ```
+//在端口视图下加入OSPF
 <RT>sys
-[RT]ospf 1
-[RT]route-if 1.1.1.1
+[RT]ospf 1 route-id 1.1.1.1
 [RT]area 0
 [sw-ospf-1-area-0.0.0.0]quit
 [RT]int g 0/0/0
 [RT-GigabitEthernet0/0/0]ospf enable 1 area 0
+
+//在area视图下加入OSPF
+<RT>sys
+[RT]ospf 1 route-id 1.1.1.1
+[RT]area 0
+[RT-ospf-1-area-0.0.0.0]net x.x.x.x y.y.y.y(前者是网段地址/接口地址、后者是子网掩码反码)
 ```
 ### IPv6环境（OSPFv3）
 ```
 <RT>sys
-[RT]ospfb3 1
+[RT]ospfv3 1
 [RT]route-if 1.1.1.1
 [RT]area 0
 [sw-ospf-1-area-0.0.0.0]quit
 [RT]int g 0/0/0
-[RT-GigabitEthernet0/0/0]ospf enable 1 area 0
+[RT-GigabitEthernet0/0/0]ospfv3 1 area 0
 ```
 ## 4. 路由引入
 在缺省情况下，各路由协议不引入其它协议的路由。可以引入其他进程或其他协议学到的路由信息，从而丰富路由表项。
@@ -396,7 +402,7 @@ process-id 为进程号，缺省值为1。路由器支持OSPF多进程，可以�
 [RT-GigabitEthernet0/0/9]ipv6 address FC00:2::1 64
 [RT-GigabitEthernet0/0/9]dhcpv6 server pool1            //将接口与地址池绑定
 [RT-GigabitEthernet0/0/9]undo ipv6 nd ra halt
-[RT-GigabitEthernet0/0/9]ipv6 nd autoconfig managed-address-flag  #此命令用来设置RA报文中的有状态自动配置地址的标志位, 如果设置了该标志位，则PC可以通过DHCPv6有状态自动分配方式获得IPv6地址。
+[RT-GigabitEthernet0/0/9]ipv6 nd autoconfig managed-address-flag  //此命令用来设置RA报文中的有状态自动配置地址的标志位, 如果设置了该标志位，则PC可以通过DHCPv6有状态自动分配方式获得IPv6地址。
 ```
 
 ## 3. 无状态自动配置（SLAAC）
@@ -409,3 +415,100 @@ process-id 为进程号，缺省值为1。路由器支持OSPF多进程，可以�
 [R1-GigabitEthernet0/0/9]undo ipv6 nd ra halt       // 此命令用于激活接口发布RA报文的功能
 [R1-GigabitEthernet0/0/9]quit
 ```
+
+
+# 第八章：ACL配置和NAT配置
+## ACL
+ACl可以在路由器接口的输入(inbound)和输出(outbound)两个方向上对IP包进行过滤
+
+![ACL类型](./image/ACL类型.png)
+
+### IPv4环境下ACL配置
+```
+//创建ACL
+[RT]acl acl-number [ match-order { config | auto } ] 
+//config：匹配规则时按用户的配置顺序。 
+//auto：匹配规则时按“深度优先”的顺序。
+//acl-number需要遵守ACL类型的需求，不同的类型对应指令以及过滤能力不同
+
+//ACL规则配置
+[RT-acl-basic-2000]rule [rule-id] {permit | deny} [source sour-addr sour-wildcard | any] [time-range time-name]
+//sour-wildcard：源地址掩码反码
+//基本ACL只允许对源地址进行过滤，不允许对目的地址过滤
+
+[RT-acl-adv-3000]rule [rule-id] {permit | deny} protocol [source sour-addr sour-wildcard | any] [ destination dest-addr dest-wildcard | any] [ source-port operator port1 [ port2 ] ] [ destination-port operator port1 [ port2 ] ] [ icmp-type { icmp-message | icmp-type icmp-code} ] [ time-range time-name ]
+//protocol : ip, ospf, igmp, gre, icmp, tcp, udp, etc. 
+//高级ACL允许同时对源地址、目的地址、协议以及端口进行过滤
+
+//在接口上应用ACL规则
+[RT-Serial1/0/0]traffic-filter {inbound | outbound} acl {acl-number | name acl-name}
+//inbound和outbound一定要区分清楚
+
+//显示ACL的配置及运行情况
+[任意视图]dis acl {all | acl-number}
+//显示设备上所有基于ACL进行报文过滤的应用信息
+[任意视图]dis traffic-filter applied-record
+//显示指定接口上基于ACL进行报文过滤的流量统计信息
+[任意视图]dis traffic-filter statistics int interface-type interface-number {inbound | outbound}
+```
+
+### IPv6环境下ACL配置
+```
+[RT]acl ipv6 3000
+[...]rule deny ipv6 source fc00:0::1 128 destination fc00:2::1 128
+[...]quit
+[RT]int g 0/0/0
+[...]traffic-filter inbound ipv6 acl 3000
+//IPV6环境下不使用掩码的反码，而是直接使用掩码/掩码长度
+```
+
+## NAT
+### IPv4环境下配置NAT
+NAT有两种实现方式：  
+    1. 定义地址池  
+        当内部网络有数据包要发往外部网络时，首先根据该ACL判定是否是允许的数据包，  
+        然后再根据定义的关联找到与之对应的地址池，最后再把源地址转换成这个地址池中的某一个地址  
+    2. 直接将内网地址映射到NAT路由器的接口上  
+        接口与ACL的关联又称EASY IP 特性，它是指在地址转换的过程中直接使用接口的IP地址作为转换后的源地址  
+```
+//定义地址池
+[RT]nat address-group group-index start-address end-address
+    eg.[RT]nat address-group 1 address 210.30.101.1 210.30.101.4
+//定义地址池与ACL的关联
+[RT-Serial1/0/0]nat outbound acl-number address-group group-index 
+    eg.[RT]acl 2000 match-order auto
+       [RT-acl-basic-2000]rule permit source 192.168.1.0 0.0.0.255
+       [RT-acl-basic-2000]rule deny source any
+       [RT]nat address-group 1 address 210.30.101.1 210.30.101.4
+       [RT-Serial1/0/0]nat outbound 2000 address-group 1
+    
+//定义接口与ACL的关联
+[RT-Serial1/0/0]nat outbound 2000
+    eg.[RT]acl 2000 match-order auto
+       [RT-acl-basic-2000]rule permit source 192.168.1.0 0.0.0.255
+       [RT-acl-basic-2000]rule deny source any
+       [RT-Serial1/0]nat outbound 2000
+```
+
+用户可将内部服务器的IP地址和端口号映射到NAT路由器的外部地址以及端口号上，从而实现由外部网络访问内部服务器的功能。
+```
+//建立地址池映射命令：
+[RT-Serial1/0/0]nat server protocol {protocol-number | icmp | tcp | udp} global global-addr { global-port | any | domain | ftp | pop3 | smtp | telnet | www } inside local-addr { local-port | any | domain | ftp | pop3 | smtp | telnet | www }
+    eg.[RT-Serial1/0/0]nat server protocol tcp global 210.30.103.22 8080 inside 192.168.1.4 www
+
+//建立接口映射命令
+[RT-Serial1/0/0]nat server protocol {protocol-number | icmp | tcp | udp} global current-int { global-port | any | domain | ftp | pop3 | smtp | telnet | www } inside local-addr { local-port | any | domain | ftp | pop3 | smtp | telnet | www }
+!!!如果想借用接口地址作为转换后的外网地址，可以配置参数current-interface或者loopback
+```
+
+一般情况下，NAT只能对IP报文头的IP地址和TCP/UDP头部的端口信息进行转换。  
+对于一些特殊协议，例如DNS、FTP等，它们报文的数据部分可能包含IP地址或端口信息，这些内容不能被NAT有效的转换，从而无法正确完成通信。  
+使能ALG(Application Level Gateway)功能可以使NAT设备识别被封装在报文数据部分的IP地址或端口信息，并根据映射表项
+进行替换，实现报文正常穿越NAT。
+```
+[RT]nat alg ftp enable
+```  
+      
+
+
+
